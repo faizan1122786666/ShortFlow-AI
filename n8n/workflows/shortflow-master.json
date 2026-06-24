@@ -1,0 +1,151 @@
+{
+  "name": "ShortFlow Master Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "shortflow",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "name": "Publish Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "shortflow-publish-id"
+    },
+    {
+      "parameters": { "options": {} },
+      "name": "Validate Payload",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": { "options": {} },
+      "name": "Download Video From Supabase URL",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": { "options": {} },
+      "name": "Process Metadata",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": { "options": {} },
+      "name": "Update Supabase",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": { "options": {} },
+      "name": "Return Success",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "name": "Schedule Cron Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [250, 500]
+    },
+    {
+      "parameters": { "options": {} },
+      "name": "Check Scheduled Videos",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [450, 500]
+    },
+    {
+      "parameters": { "options": {} },
+      "name": "Publish Due Videos",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [650, 500]
+    },
+
+    {
+      "parameters": {
+        "path": "error-handler",
+        "options": {}
+      },
+      "name": "Error Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 700],
+      "webhookId": "error-handler-webhook-id"
+    },
+    {
+      "parameters": { "options": {} },
+      "name": "Store Failure",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [450, 700]
+    },
+    {
+      "parameters": { "options": {} },
+      "name": "Update Error Database",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [650, 700]
+    },
+    {
+      "parameters": { "options": {} },
+      "name": "Retry Logic",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [850, 700]
+    }
+  ],
+  "connections": {
+    "Publish Webhook": {
+      "main": [ [ { "node": "Validate Payload", "type": "main", "index": 0 } ] ]
+    },
+    "Validate Payload": {
+      "main": [ [ { "node": "Download Video From Supabase URL", "type": "main", "index": 0 } ] ]
+    },
+    "Download Video From Supabase URL": {
+      "main": [ [ { "node": "Process Metadata", "type": "main", "index": 0 } ] ]
+    },
+    "Process Metadata": {
+      "main": [ [ { "node": "Update Supabase", "type": "main", "index": 0 } ] ]
+    },
+    "Update Supabase": {
+      "main": [ [ { "node": "Return Success", "type": "main", "index": 0 } ] ]
+    },
+
+    "Schedule Cron Trigger": {
+      "main": [ [ { "node": "Check Scheduled Videos", "type": "main", "index": 0 } ] ]
+    },
+    "Check Scheduled Videos": {
+      "main": [ [ { "node": "Publish Due Videos", "type": "main", "index": 0 } ] ]
+    },
+
+    "Error Webhook Trigger": {
+      "main": [ [ { "node": "Store Failure", "type": "main", "index": 0 } ] ]
+    },
+    "Store Failure": {
+      "main": [ [ { "node": "Update Error Database", "type": "main", "index": 0 } ] ]
+    },
+    "Update Error Database": {
+      "main": [ [ { "node": "Retry Logic", "type": "main", "index": 0 } ] ]
+    }
+  },
+  "active": false,
+  "settings": {}
+}

@@ -1,0 +1,50 @@
+{
+  "name": "Error Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "error-handler",
+        "options": {}
+      },
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "error-handler-webhook-id"
+    },
+    {
+      "parameters": { "options": {} },
+      "name": "Store Failure",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": { "options": {} },
+      "name": "Update Database",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": { "options": {} },
+      "name": "Retry Logic",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [ [ { "node": "Store Failure", "type": "main", "index": 0 } ] ]
+    },
+    "Store Failure": {
+      "main": [ [ { "node": "Update Database", "type": "main", "index": 0 } ] ]
+    },
+    "Update Database": {
+      "main": [ [ { "node": "Retry Logic", "type": "main", "index": 0 } ] ]
+    }
+  },
+  "active": false,
+  "settings": {}
+}

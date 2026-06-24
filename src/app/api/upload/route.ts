@@ -1,0 +1,102 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import type { Platform } from "@/types";
+
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const formData = await request.formData();
+    const file = formData.get("file") as File | null;
+    const title = (formData.get("title") as string) || null;
+    const description = (formData.get("description") as string) || null;
+    const hashtagsRaw = (formData.get("hashtags") as string) || "";
+    const platformsRaw = formData.get("platforms") as string;
+    const scheduledAt = (formData.get("scheduledAt") as string) || null;
+
+    if (!file) {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    // Validate max size: 100 MB
+    const MAX_SIZE = 100 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      return NextResponse.json({ error: "File size exceeds 100MB limit" }, { status: 400 });
+    }
+
+    // Validate file type
+    const validTypes = ["video/mp4", "video/quicktime", "video/webm"];
+    if (!validTypes.includes(file.type)) {
+      return NextResponse.json({ error: "Invalid file type. Only MP4, MOV, and WebM are allowed." }, { status: 400 });
+    }
+
+    const hashtags = hashtagsRaw
+      .split(/\s+/)
+      .filter((h) => h.startsWith("#") || h.length > 0)
+      .map((h) => (h.startsWith("#") ? h : `#${h}`));
+
+    let platforms: Platform[] = [];
+    try {
+      platforms = JSON.parse(platformsRaw) as Platform[];
+    } catch {
+      return NextResponse.json({ error: "Invalid platforms" }, { status: 400 });
+    }
+
+    const ext = file.name.split(".").pop() ?? "mp4";
+    const filePath = `${user.id}/${Date.now()}.${ext}`;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const { error: uploadError } = await supabase.storage
+      .from("videos")
+      .upload(filePath, arrayBuffer, {
+        contentType: file.type,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      return NextResponse.json(
+        { error: uploadError.message },
+        { status: 500 }
+      );
+    }
+
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("videos").getPublicUrl(filePath);
+
+    const status = scheduledAt ? "scheduled" : "draft";
+
+    const { data: video, error: dbError } = await supabase
+      .from("videos")
+      .insert({
+        user_id: user.id,
+        video_url: publicUrl,
+        title,
+        description,
+        hashtags,
+        platforms,
+        scheduled_at: scheduledAt,
+        status,
+      })
+      .select()
+      .single();
+
+    if (dbError) {
+      return NextResponse.json({ error: dbError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ video }, { status: 201 });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Upload failed" },
+      { status: 500 }
+    );
+  }
+}
