@@ -12,7 +12,7 @@ import {
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-background" suppressHydrationWarning>
+    <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">

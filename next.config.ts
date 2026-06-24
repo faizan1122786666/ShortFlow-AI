@@ -1,4 +1,4 @@
-﻿import type { NextConfig } from 'next';
+import type { NextConfig } from 'next';
 import path from 'path';
 
 const nextConfig: NextConfig = {
@@ -21,8 +21,8 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // Apply to all static assets
-        source: '/(.*)',
+        // Only cache versioned Next.js static assets (JS/CSS bundles) forever
+        source: '/_next/static/:path*',
         headers: [
           {
             key: 'Cache-Control',
@@ -31,7 +31,7 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Cache API routes for a short time (or none)
+        // API routes — never cache
         source: '/api/:path*',
         headers: [
           {
