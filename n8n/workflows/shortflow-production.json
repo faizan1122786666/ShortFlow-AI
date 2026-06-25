@@ -1,24 +1,24 @@
 {
-  "name": "ShortFlow Production Workflow",
+  "name": "ShortFlow Production Workflow - Corrected",
   "nodes": [
     {
       "parameters": {
-        "path": "shortflow",
-        "responseMode": "lastNode",
+        "path": "video-publish",
+        "responseMode": "responseNode",
         "options": {}
       },
       "name": "Publish Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [250, 300],
-      "webhookId": "shortflow-publish-id"
+      "position": [200, 220],
+      "webhookId": "shortflow-video-publish"
     },
     {
       "parameters": {
         "conditions": {
           "string": [
             {
-              "value1": "={{$json.body.videoUrl}}",
+              "value1": "={{$json.body.videoId}}",
               "operation": "isNotEmpty"
             },
             {
@@ -26,27 +26,74 @@
               "operation": "isNotEmpty"
             },
             {
-              "value1": "={{$json.body.scheduledAt}}",
+              "value1": "={{$json.body.videoUrl}}",
               "operation": "isNotEmpty"
             }
           ]
         }
       },
-      "name": "Validate Payload",
+      "name": "Validate Webhook Payload",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [450, 300]
+      "position": [420, 220]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "immediate-empty-scheduled-at",
+              "leftValue": "={{$node[\"Publish Webhook\"].json.body.scheduledAt}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isEmpty"
+              }
+            },
+            {
+              "id": "immediate-past-scheduled-at",
+              "leftValue": "={{$node[\"Publish Webhook\"].json.body.scheduledAt ? new Date($node[\"Publish Webhook\"].json.body.scheduledAt).getTime() : 0}}",
+              "rightValue": "={{Date.now()}}",
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ],
+          "combinator": "or"
+        }
+      },
+      "name": "Is Immediate Publish",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [640, 220]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": false,\n  \"error\": \"Missing required payload fields\"\n}",
+        "responseBody": "={\"success\":false,\"error\":\"Missing videoId, userId, or videoUrl\"}",
         "options": {}
       },
       "name": "Return Invalid",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [650, 100]
+      "position": [640, 80]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"success\":true,\"message\":\"Video is scheduled for cron publishing; webhook publish skipped\"}",
+        "options": {}
+      },
+      "name": "Return Scheduled Deferred",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [860, 80]
     },
     {
       "parameters": {
@@ -55,57 +102,78 @@
         "responseFormat": "file",
         "options": {}
       },
-      "name": "Download Video From Supabase URL",
+      "name": "Download Webhook Video",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [650, 300]
+      "position": [860, 220]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "http://host.docker.internal:3000/api/generate",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"type\": \"all\",\n  \"context\": \"{{$node['Publish Webhook'].json.body.description || 'viral video'}}\",\n  \"videoId\": \"{{$node['Publish Webhook'].json.body.videoId}}\"\n}",
+        "title": "={{$node[\"Publish Webhook\"].json.body.title || \"Untitled\"}}",
+        "description": "={{($node[\"Publish Webhook\"].json.body.description || \"\") + \"\\n\\n\" + (($node[\"Publish Webhook\"].json.body.hashtags || []).join(\" \"))}}",
+        "categoryId": "22",
+        "privacyStatus": "public",
+        "binaryPropertyName": "data",
         "options": {}
       },
-      "name": "Process Metadata",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 3,
-      "position": [850, 300]
+      "name": "Upload Webhook Video to YouTube",
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [1080, 220]
     },
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{$env.SUPABASE_URL || 'http://host.docker.internal:8000'}}/rest/v1/videos?id=eq.{{$node['Publish Webhook'].json.body.videoId}}",
+        "url": "={{$env.SUPABASE_URL + \"/rest/v1/videos?id=eq.\" + $node[\"Publish Webhook\"].json.body.videoId}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"title\": \"{{$json.title}}\",\n  \"description\": \"{{$json.description}}\",\n  \"hashtags\": {{$json.hashtags}},\n  \"status\": \"scheduled\"\n}",
+        "jsonBody": "={\"status\":\"published\"}",
         "options": {}
       },
-      "name": "Update Supabase",
+      "name": "Mark Webhook Video Published",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [1050, 300]
+      "position": [1300, 220]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Video metadata processed and scheduled successfully\"\n}",
+        "responseBody": "={\"success\":true,\"message\":\"Video published to YouTube\"}",
         "options": {}
       },
       "name": "Return Success",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [1250, 300]
+      "position": [1520, 220]
     },
-
     {
       "parameters": {
         "rule": {
           "interval": [
             {
-              "field": "minutes"
+              "field": "minutes",
+              "expression": 5
             }
           ]
         }
@@ -113,118 +181,218 @@
       "name": "Schedule Cron Trigger",
       "type": "n8n-nodes-base.cron",
       "typeVersion": 1,
-      "position": [250, 500]
+      "position": [200, 520]
     },
     {
       "parameters": {
         "method": "GET",
-        "url": "={{$env.SUPABASE_URL || 'http://host.docker.internal:8000'}}/rest/v1/videos?status=eq.scheduled&scheduled_at=lte.now",
+        "url": "={{$env.SUPABASE_URL + \"/rest/v1/videos?select=*&status=eq.scheduled&scheduled_at=lte.\" + $now.toUTC().toISO()}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            }
+          ]
+        },
         "options": {}
       },
       "name": "Check Scheduled Videos",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [450, 500]
+      "position": [420, 520]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "http://host.docker.internal:3000/api/publish",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"videoId\": \"{{$json.id}}\",\n  \"platforms\": {{$json.platforms}}\n}",
+        "method": "GET",
+        "url": "={{$json.video_url}}",
+        "responseFormat": "file",
         "options": {}
       },
-      "name": "Publish Due Videos",
+      "name": "Download Scheduled Video",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [650, 500]
+      "position": [640, 520]
     },
-
     {
       "parameters": {
-        "path": "error-handler",
+        "title": "={{$node[\"Check Scheduled Videos\"].json.title || \"Untitled\"}}",
+        "description": "={{($node[\"Check Scheduled Videos\"].json.description || \"\") + \"\\n\\n\" + (($node[\"Check Scheduled Videos\"].json.hashtags || []).join(\" \"))}}",
+        "categoryId": "22",
+        "privacyStatus": "public",
+        "binaryPropertyName": "data",
         "options": {}
       },
-      "name": "Error Webhook Trigger",
-      "type": "n8n-nodes-base.webhook",
+      "name": "Upload Scheduled Video to YouTube",
+      "type": "n8n-nodes-base.youTube",
       "typeVersion": 1,
-      "position": [250, 700],
-      "webhookId": "error-handler-webhook-id"
+      "position": [860, 520]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{$env.SUPABASE_URL || 'http://host.docker.internal:8000'}}/rest/v1/publish_history",
+        "method": "PATCH",
+        "url": "={{$env.SUPABASE_URL + \"/rest/v1/videos?id=eq.\" + $node[\"Check Scheduled Videos\"].json.id}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"video_id\": \"{{$json.body.videoId}}\",\n  \"status\": \"failed\",\n  \"platform\": \"{{$json.body.platform || 'all'}}\"\n}",
+        "jsonBody": "={\"status\":\"published\"}",
         "options": {}
       },
-      "name": "Store Failure",
+      "name": "Mark Scheduled Video Published",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [450, 700]
-    },
-    {
-      "parameters": {
-        "jsCode": "let retries = $json.body.retryCount || 0;\nif (retries < 3) {\n  retries++;\n  return { json: { retry: true, retryCount: retries, videoId: $json.body.videoId, platform: $json.body.platform } };\n}\nreturn { json: { retry: false } };"
-      },
-      "name": "Retry Logic",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [650, 700]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "http://host.docker.internal:3000/api/publish",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"videoId\": \"{{$json.videoId}}\",\n  \"platforms\": [\"{{$json.platform}}\"]\n}",
-        "options": {}
-      },
-      "name": "Execute Retry",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 3,
-      "position": [850, 600]
+      "position": [1080, 520]
     }
   ],
   "connections": {
     "Publish Webhook": {
-      "main": [ [ { "node": "Validate Payload", "type": "main", "index": 0 } ] ]
-    },
-    "Validate Payload": {
       "main": [
-        [ { "node": "Download Video From Supabase URL", "type": "main", "index": 0 } ],
-        [ { "node": "Return Invalid", "type": "main", "index": 0 } ]
+        [
+          {
+            "node": "Validate Webhook Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Download Video From Supabase URL": {
-      "main": [ [ { "node": "Process Metadata", "type": "main", "index": 0 } ] ]
+    "Validate Webhook Payload": {
+      "main": [
+        [
+          {
+            "node": "Is Immediate Publish",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "Process Metadata": {
-      "main": [ [ { "node": "Update Supabase", "type": "main", "index": 0 } ] ]
+    "Is Immediate Publish": {
+      "main": [
+        [
+          {
+            "node": "Download Webhook Video",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Scheduled Deferred",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "Update Supabase": {
-      "main": [ [ { "node": "Return Success", "type": "main", "index": 0 } ] ]
+    "Download Webhook Video": {
+      "main": [
+        [
+          {
+            "node": "Upload Webhook Video to YouTube",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-
+    "Upload Webhook Video to YouTube": {
+      "main": [
+        [
+          {
+            "node": "Mark Webhook Video Published",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Webhook Video Published": {
+      "main": [
+        [
+          {
+            "node": "Return Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Schedule Cron Trigger": {
-      "main": [ [ { "node": "Check Scheduled Videos", "type": "main", "index": 0 } ] ]
+      "main": [
+        [
+          {
+            "node": "Check Scheduled Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Check Scheduled Videos": {
-      "main": [ [ { "node": "Publish Due Videos", "type": "main", "index": 0 } ] ]
+      "main": [
+        [
+          {
+            "node": "Download Scheduled Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-
-    "Error Webhook Trigger": {
-      "main": [ [ { "node": "Store Failure", "type": "main", "index": 0 } ] ]
+    "Download Scheduled Video": {
+      "main": [
+        [
+          {
+            "node": "Upload Scheduled Video to YouTube",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "Store Failure": {
-      "main": [ [ { "node": "Retry Logic", "type": "main", "index": 0 } ] ]
-    },
-    "Retry Logic": {
-      "main": [ [ { "node": "Execute Retry", "type": "main", "index": 0 } ] ]
+    "Upload Scheduled Video to YouTube": {
+      "main": [
+        [
+          {
+            "node": "Mark Scheduled Video Published",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,

@@ -6,6 +6,7 @@ import type { Platform } from "@/types";
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -15,6 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+
     const { videoId, platforms } = body as {
       videoId: string;
       platforms: Platform[];
@@ -38,51 +40,55 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Video not found" }, { status: 404 });
     }
 
-    const { error: updateError } = await supabase
-      .from("videos")
-      .update({ status: "scheduled", platforms })
-      .eq("id", videoId);
-
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    if (video.status === "published") {
+      return NextResponse.json(
+        { error: "Video is already published" },
+        { status: 400 }
+      );
     }
 
-    for (const platform of platforms) {
-      await supabase.from("publish_history").upsert({
-        video_id: videoId,
-        platform,
-        status: "pending",
-      }, { onConflict: 'video_id, platform' });
-    }
-
-    // Try to trigger n8n, but don't fail if it doesn't work
-    try {
-      const n8nResult = await triggerPublishWorkflow({
-        videoId,
-        userId: user.id,
-        videoUrl: video.video_url,
-        title: video.title ?? "Untitled",
-        description: video.description ?? "",
-        hashtags: video.hashtags ?? [],
-        platforms,
-        scheduledAt: video.scheduled_at ?? undefined,
-      });
-
-      if (!n8nResult.success) {
-        console.warn("n8n trigger warning:", n8nResult.error);
+    if (video.status === "scheduled" && video.scheduled_at) {
+      const scheduledAt = new Date(video.scheduled_at).getTime();
+      if (scheduledAt > Date.now()) {
+        return NextResponse.json(
+          {
+            error:
+              "This video is scheduled for later. Scheduled uploads are handled by the cron workflow, not /api/publish.",
+          },
+          { status: 400 }
+        );
       }
-    } catch (n8nErr) {
-      console.warn("n8n not available, skipping:", n8nErr);
+    }
+
+    const n8nResult = await triggerPublishWorkflow({
+      videoId,
+      userId: user.id,
+      videoUrl: video.video_url,
+      title: video.title ?? "Untitled",
+      description: video.description ?? "",
+      hashtags: video.hashtags ?? [],
+      platforms,
+    });
+
+    if (!n8nResult.success) {
+      return NextResponse.json(
+        { error: n8nResult.error ?? "Failed to trigger publish workflow" },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
       success: true,
       videoId,
+      n8nTriggered: true,
     });
   } catch (err) {
     console.error("Publish failed:", err);
+
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Publish failed" },
+      {
+        error: err instanceof Error ? err.message : "Publish failed",
+      },
       { status: 500 }
     );
   }

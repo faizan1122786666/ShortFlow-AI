@@ -26,9 +26,17 @@ export function AIGenerator({ context, onGenerated, disabled }: AIGeneratorProps
 
     setLoading(type);
     try {
+      // Get the locally stored API keys
+      const storedKeys = localStorage.getItem("shortflow_api_keys");
+      const apiKeys = storedKeys ? JSON.parse(storedKeys) : {};
+      const geminiKey = apiKeys.gemini || "";
+
       const response = await fetch("/api/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-gemini-api-key": geminiKey 
+        },
         body: JSON.stringify({ type, context }),
       });
 

@@ -1,5 +1,5 @@
 {
-  "name": "Scheduled Publisher",
+  "name": "Scheduled Publisher (deprecated - use shortflow-production cron)",
   "nodes": [
     {
       "parameters": {
@@ -20,9 +20,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.SUPABASE_URL }}/rest/v1/videos?status=eq.scheduled&scheduled_at=lt.{{ new Date().toISOString() }}&select=*",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "n8n-community-node-package-supabase.supabaseApi",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/videos?select=*&status=eq.scheduled&scheduled_at=lte.{{ $now.toUTC().toISO() }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -42,69 +40,6 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [450, 300]
-    },
-    {
-      "parameters": {
-        "batchSize": 1,
-        "options": {}
-      },
-      "name": "Split In Batches",
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
-      "position": [650, 300]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $env.N8N_WEBHOOK_URL }}",
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "videoId",
-              "value": "={{ $json.id }}"
-            },
-            {
-              "name": "userId",
-              "value": "={{ $json.user_id }}"
-            },
-            {
-              "name": "videoUrl",
-              "value": "={{ $json.video_url }}"
-            },
-            {
-              "name": "title",
-              "value": "={{ $json.title }}"
-            },
-            {
-              "name": "description",
-              "value": "={{ $json.description }}"
-            },
-            {
-              "name": "hashtags",
-              "value": "={{ $json.hashtags }}"
-            },
-            {
-              "name": "platforms",
-              "value": "={{ $json.platforms }}"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "name": "Trigger Publish Workflow",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.1,
-      "position": [850, 300]
-    },
-    {
-      "parameters": {
-        "loopBackNode": "Split In Batches"
-      },
-      "name": "Loop Over Items",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [1050, 300]
     }
   ],
   "connections": {
@@ -113,39 +48,6 @@
         [
           {
             "node": "Get Due Videos",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Due Videos": {
-      "main": [
-        [
-          {
-            "node": "Split In Batches",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Split In Batches": {
-      "main": [
-        [
-          {
-            "node": "Trigger Publish Workflow",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Trigger Publish Workflow": {
-      "main": [
-        [
-          {
-            "node": "Loop Over Items",
             "type": "main",
             "index": 0
           }

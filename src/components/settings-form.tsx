@@ -17,7 +17,7 @@ import { Loader2 } from "lucide-react";
 
 export function SettingsForm({ email }: { email: string }) {
   const [notifications, setNotifications] = useState(true);
-  const [autoPublish, setAutoPublish] = useState(false);
+  const [autoPublish, setAutoPublish] = useState(true);
   const [saving, setSaving] = useState(false);
 
   async function handleSave(e: React.FormEvent) {

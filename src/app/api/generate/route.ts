@@ -20,6 +20,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid type" }, { status: 400 });
     }
 
+    const apiKey = request.headers.get("x-gemini-api-key");
+    if (!apiKey) {
+      return NextResponse.json({ error: "No Gemini API key provided. Please set it in the API Keys page." }, { status: 401 });
+    }
+
     let ctx = context ?? "short form vertical video content";
 
     if (videoId) {
@@ -35,24 +40,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!process.env.GEMINI_API_KEY) {
-      return NextResponse.json(
-        {
-          title: type === "title" || type === "all" ? "Amazing Short Video" : undefined,
-          description:
-            type === "description" || type === "all"
-              ? "Check out this incredible short-form content!"
-              : undefined,
-          hashtags:
-            type === "hashtags" || type === "all"
-              ? ["#shorts", "#viral", "#trending", "#fyp"]
-              : undefined,
-        },
-        { status: 200 }
-      );
-    }
-
-    const result = await generateMetadata(type, ctx);
+    const result = await generateMetadata(type, ctx, apiKey);
     return NextResponse.json(result);
   } catch (err) {
     return NextResponse.json(

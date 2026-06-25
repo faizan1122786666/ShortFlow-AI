@@ -22,6 +22,7 @@ import { toast } from "sonner";
 
 export function VideoUploadForm() {
   const router = useRouter();
+
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -37,7 +38,9 @@ export function VideoUploadForm() {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragActive(false);
+
     const dropped = e.dataTransfer.files[0];
+
     if (dropped?.type.startsWith("video/")) {
       setFile(dropped);
     } else {
@@ -53,15 +56,13 @@ export function VideoUploadForm() {
       return;
     }
 
-    const validTypes = ["video/mp4", "video/quicktime", "video/webm"];
-    if (!validTypes.includes(file.type)) {
-      toast.error("Invalid file type. Please upload MP4, MOV, or WebM.");
+    if (!date) {
+      toast.error("Please select a schedule date");
       return;
     }
 
-    const MAX_SIZE = 100 * 1024 * 1024; // 100 MB
-    if (file.size > MAX_SIZE) {
-      toast.error("File size must be less than 100 MB");
+    if (!time) {
+      toast.error("Please select a schedule time");
       return;
     }
 
@@ -70,58 +71,56 @@ export function VideoUploadForm() {
       return;
     }
 
+    const validTypes = ["video/mp4", "video/quicktime", "video/webm"];
+
+    if (!validTypes.includes(file.type)) {
+      toast.error("Invalid file type. Please upload MP4, MOV, or WebM.");
+      return;
+    }
+
+    const MAX_SIZE = 100 * 1024 * 1024;
+
+    if (file.size > MAX_SIZE) {
+      toast.error("File size must be less than 100 MB");
+      return;
+    }
+
     setUploading(true);
+
     try {
+      const [hours, minutes] = time.split(":");
+      const scheduled = new Date(date);
+
+      scheduled.setHours(Number(hours), Number(minutes), 0, 0);
+
+      if (scheduled.getTime() <= Date.now()) {
+        toast.error("Scheduled time must be in the future");
+        return;
+      }
+
       const formData = new FormData();
+
       formData.append("file", file);
       formData.append("title", title);
       formData.append("description", description);
       formData.append("hashtags", hashtags);
       formData.append("platforms", JSON.stringify(platforms));
-
-      if (date && time) {
-        const [hours, minutes] = time.split(":");
-        const scheduled = new Date(date);
-        scheduled.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-        formData.append("scheduledAt", scheduled.toISOString());
-      }
+      formData.append("scheduledAt", scheduled.toISOString());
 
       const uploadRes = await fetch("/api/upload", {
         method: "POST",
         body: formData,
       });
 
+      const uploadData = await uploadRes.json();
+
       if (!uploadRes.ok) {
-        const err = await uploadRes.json();
-        throw new Error(err.error ?? "Upload failed");
+        throw new Error(uploadData.error ?? "Upload failed");
       }
 
-      const { video } = await uploadRes.json();
+      toast.success("Video scheduled successfully!");
 
-      if (date) {
-        try {
-          const publishRes = await fetch("/api/publish", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              videoId: video.id,
-              platforms,
-            }),
-          });
-
-          if (!publishRes.ok) {
-            toast.warning("Video uploaded but scheduling failed");
-          } else {
-            toast.success("Video scheduled successfully!");
-          }
-        } catch (schedulingErr) {
-          toast.warning("Video uploaded, scheduling will happen later");
-        }
-      } else {
-        toast.success("Video uploaded as draft");
-      }
-
-      router.push(date ? "/scheduled" : "/dashboard");
+      router.push("/scheduled");
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
@@ -136,9 +135,10 @@ export function VideoUploadForm() {
         <CardHeader>
           <CardTitle>Upload Video</CardTitle>
           <CardDescription>
-            Upload a short-form vertical video (MP4, WebM, MOV)
+            Upload a short-form vertical video MP4, WebM, or MOV
           </CardDescription>
         </CardHeader>
+
         <CardContent>
           <div
             className={`relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-12 transition-colors ${
@@ -160,6 +160,7 @@ export function VideoUploadForm() {
                 <p className="text-sm text-muted-foreground">
                   {(file.size / (1024 * 1024)).toFixed(2)} MB
                 </p>
+
                 <Button
                   type="button"
                   variant="outline"
@@ -175,6 +176,7 @@ export function VideoUploadForm() {
                 <p className="mb-2 text-sm text-muted-foreground">
                   Drag & drop or click to upload
                 </p>
+
                 <Input
                   type="file"
                   accept="video/*"
@@ -192,6 +194,7 @@ export function VideoUploadForm() {
           <CardTitle>Platforms</CardTitle>
           <CardDescription>Choose where to publish</CardDescription>
         </CardHeader>
+
         <CardContent>
           <PlatformSelector selected={platforms} onChange={setPlatforms} />
         </CardContent>
@@ -202,6 +205,7 @@ export function VideoUploadForm() {
           <CardTitle>Schedule</CardTitle>
           <CardDescription>Set date and time for publishing</CardDescription>
         </CardHeader>
+
         <CardContent>
           <DateTimePicker
             date={date}
@@ -215,10 +219,9 @@ export function VideoUploadForm() {
       <Card>
         <CardHeader>
           <CardTitle>Metadata</CardTitle>
-          <CardDescription>
-            Add details or generate with AI
-          </CardDescription>
+          <CardDescription>Add details or generate with AI</CardDescription>
         </CardHeader>
+
         <CardContent className="space-y-4">
           <AIGenerator
             context={context}
@@ -266,12 +269,12 @@ export function VideoUploadForm() {
         {uploading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Uploading...
+            Scheduling...
           </>
         ) : (
           <>
             <Upload className="mr-2 h-4 w-4" />
-            Upload & Schedule
+            Schedule Video
           </>
         )}
       </Button>

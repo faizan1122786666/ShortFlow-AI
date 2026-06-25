@@ -28,13 +28,15 @@ export async function triggerPublishWorkflow(
   }
 
   try {
+    const { scheduledAt: _ignoredScheduledAt, ...immediatePayload } = payload;
+
     const response = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "publish",
         timestamp: new Date().toISOString(),
-        ...payload,
+        ...immediatePayload,
       }),
     });
 

@@ -1,9 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { GenerateMetadataResponse } from "@/types";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
-
-export async function generateTitle(context: string): Promise<string> {
+export async function generateTitle(context: string, apiKey: string): Promise<string> {
+  const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
   const result = await model.generateContent(
     `Generate a catchy, SEO-friendly title for a short-form vertical video. Context: ${context}. Return only the title, no quotes.`
@@ -11,7 +10,8 @@ export async function generateTitle(context: string): Promise<string> {
   return result.response.text().trim();
 }
 
-export async function generateDescription(context: string): Promise<string> {
+export async function generateDescription(context: string, apiKey: string): Promise<string> {
+  const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
   const result = await model.generateContent(
     `Generate an engaging description for a short-form vertical video. Context: ${context}. Keep it under 500 characters. Return only the description.`
@@ -19,7 +19,8 @@ export async function generateDescription(context: string): Promise<string> {
   return result.response.text().trim();
 }
 
-export async function generateHashtags(context: string): Promise<string[]> {
+export async function generateHashtags(context: string, apiKey: string): Promise<string[]> {
+  const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
   const result = await model.generateContent(
     `Generate 10 relevant hashtags for a short-form vertical video. Context: ${context}. Return only hashtags separated by spaces, each starting with #.`
@@ -29,29 +30,31 @@ export async function generateHashtags(context: string): Promise<string[]> {
 }
 
 export async function generateAllMetadata(
-  context: string
+  context: string,
+  apiKey: string
 ): Promise<GenerateMetadataResponse> {
   const [title, description, hashtags] = await Promise.all([
-    generateTitle(context),
-    generateDescription(context),
-    generateHashtags(context),
+    generateTitle(context, apiKey),
+    generateDescription(context, apiKey),
+    generateHashtags(context, apiKey),
   ]);
   return { title, description, hashtags };
 }
 
 export async function generateMetadata(
   type: "title" | "description" | "hashtags" | "all",
-  context: string
+  context: string,
+  apiKey: string
 ): Promise<GenerateMetadataResponse> {
   switch (type) {
     case "title":
-      return { title: await generateTitle(context) };
+      return { title: await generateTitle(context, apiKey) };
     case "description":
-      return { description: await generateDescription(context) };
+      return { description: await generateDescription(context, apiKey) };
     case "hashtags":
-      return { hashtags: await generateHashtags(context) };
+      return { hashtags: await generateHashtags(context, apiKey) };
     case "all":
-      return generateAllMetadata(context);
+      return generateAllMetadata(context, apiKey);
     default:
       return {};
   }
