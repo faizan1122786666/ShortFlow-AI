@@ -1,5 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
 import {
   Zap,
   Upload,
@@ -8,9 +13,40 @@ import {
   ArrowRight,
   Youtube,
   Music2,
+  Loader2,
 } from "lucide-react";
 
 export default function LandingPage() {
+  const [user, setUser] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const supabase = createClient();
+
+  useEffect(() => {
+    async function checkAuth() {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      setLoading(false);
+    }
+    checkAuth();
+  }, [supabase]);
+
+  const handleNavigate = () => {
+    if (user) {
+      router.push("/dashboard");
+    } else {
+      router.push("/register");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
@@ -22,12 +58,20 @@ export default function LandingPage() {
             <span className="text-lg font-bold">ShortFlow AI</span>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" asChild>
-              <Link href="/login">Login</Link>
-            </Button>
-            <Button asChild>
-              <Link href="/register">Get Started</Link>
-            </Button>
+            {user ? (
+              <Button asChild>
+                <Link href="/dashboard">Get Started</Link>
+              </Button>
+            ) : (
+              <>
+                <Button variant="ghost" asChild>
+                  <Link href="/login">Login</Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/register">Get Started</Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -45,14 +89,22 @@ export default function LandingPage() {
               descriptions, and hashtags.
             </p>
             <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-              <Button size="lg" asChild>
-                <Link href="/register">
-                  Start Free <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button size="lg" variant="outline" asChild>
-                <Link href="/login">Sign In</Link>
-              </Button>
+              {user ? (
+                <Button size="lg" onClick={handleNavigate}>
+                  Go to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              ) : (
+                <>
+                  <Button size="lg" asChild>
+                    <Link href="/register">
+                      Start Free <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                  <Button size="lg" variant="outline" asChild>
+                    <Link href="/login">Sign In</Link>
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </section>
