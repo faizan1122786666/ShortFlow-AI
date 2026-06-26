@@ -41,6 +41,57 @@
 #   n8n_data:
 
 
+# services:
+#   app:
+#     image: node:20-alpine
+#     working_dir: /app
+#     ports:
+#       - "3000:3000"
+#     volumes:
+#       - .:/app
+#       - /app/node_modules
+#       - /app/.next
+#     environment:
+#       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+#       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+#       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+#       - N8N_WEBHOOK_URL=http://n8n:5678/webhook/video-publish
+#     command: sh -c "npm install && npm run dev -- -H 0.0.0.0"
+#     depends_on:
+#       - n8n
+#     restart: unless-stopped
+
+#   n8n:
+#     image: n8nio/n8n:latest
+#     ports:
+#       - "5678:5678"
+#     environment:
+#       - N8N_HOST=0.0.0.0
+#       - N8N_PORT=5678
+#       - N8N_PROTOCOL=http
+#       - WEBHOOK_URL=http://localhost:5678/
+#       - GENERIC_TIMEZONE=UTC
+#       - SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+#       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+#       - SHORTFLOW_APP_URL=http://app:3000
+#       - N8N_WEBHOOK_URL=http://n8n:5678/webhook/video-publish
+#     volumes:
+#       - n8n_data:/home/node/.n8n
+#       - ./n8n/workflows:/home/node/workflows
+#     depends_on:
+
+#     restart: unless-stopped
+
+# volumes:
+#   n8n_data:
+
+
+
+
+
+
+version: '3.8'
+
 services:
   app:
     image: node:20-alpine
@@ -76,11 +127,6 @@ services:
       - SHORTFLOW_APP_URL=http://app:3000
       - N8N_WEBHOOK_URL=http://n8n:5678/webhook/video-publish
     volumes:
-      - n8n_data:/home/node/.n8n
+      - ./n8n:/home/node/.n8n
       - ./n8n/workflows:/home/node/workflows
-    depends_on:
-      - app
     restart: unless-stopped
-
-volumes:
-  n8n_data:
