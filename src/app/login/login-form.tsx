@@ -14,7 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Zap, Loader2 } from 'lucide-react';
+import { ArrowLeft, Zap, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 
@@ -96,7 +96,13 @@ export function LoginForm() {
   }
 
   return (
-    <div className='flex min-h-screen items-center justify-center bg-background p-4'>
+    <div className='relative flex min-h-screen items-center justify-center bg-background p-4'>
+      <Button asChild variant='ghost' size='icon' className='absolute left-4 top-4'>
+        <Link href='/'>
+          <ArrowLeft className='h-5 w-5' />
+          <span className='sr-only'>Back to home</span>
+        </Link>
+      </Button>
       <Card className='w-full max-w-md'>
         <CardHeader className='text-center'>
           <div className='mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary'>

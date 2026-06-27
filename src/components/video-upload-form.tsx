@@ -118,7 +118,7 @@ export function VideoUploadForm() {
         throw new Error(uploadData.error ?? "Upload failed");
       }
 
-      toast.success("Video scheduled successfully!");
+      toast.success("Video is uploaded and scheduled");
 
       router.push("/scheduled");
       router.refresh();

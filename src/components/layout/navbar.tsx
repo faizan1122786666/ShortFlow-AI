@@ -1,7 +1,6 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { LogOut, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -12,7 +11,6 @@ interface NavbarProps {
 }
 
 export function Navbar({ email }: NavbarProps) {
-  const router = useRouter();
   const { theme, setTheme } = useTheme();
   const supabase = createClient();
 
