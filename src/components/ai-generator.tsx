@@ -4,6 +4,41 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import type { ApiKeyProviders, ApiKeys } from "@/hooks/use-api-keys";
+
+const PROVIDER_ORDER: ApiKeyProviders[] = [
+  "gemini",
+  "openai",
+  "anthropic",
+  "groq",
+  "openrouter",
+];
+
+const PROVIDER_ALIASES: Record<string, ApiKeyProviders> = {
+  gemini: "gemini",
+  google: "gemini",
+  "google-gemini": "gemini",
+  openai: "openai",
+  chatgpt: "openai",
+  anthropic: "anthropic",
+  claude: "anthropic",
+  groq: "groq",
+  grok: "groq",
+  openrouter: "openrouter",
+  "open-router": "openrouter",
+};
+
+function normalizeStoredKeys(keys: Record<string, unknown>): Partial<ApiKeys> {
+  return Object.entries(keys).reduce<Partial<ApiKeys>>((normalized, [key, value]) => {
+    const provider = PROVIDER_ALIASES[key.trim().toLowerCase()];
+
+    if (provider && typeof value === "string") {
+      normalized[provider] = value;
+    }
+
+    return normalized;
+  }, {});
+}
 
 interface AIGeneratorProps {
   context: string;
@@ -28,16 +63,24 @@ export function AIGenerator({ context, onGenerated, disabled }: AIGeneratorProps
     try {
       // Get the locally stored API keys
       const storedKeys = localStorage.getItem("shortflow_api_keys");
-      const apiKeys = storedKeys ? JSON.parse(storedKeys) : {};
-      const geminiKey = apiKeys.gemini || "";
+      const parsedKeys = (storedKeys ? JSON.parse(storedKeys) : {}) as Record<string, unknown>;
+      const apiKeys = normalizeStoredKeys(parsedKeys);
+      const provider = PROVIDER_ORDER.find((key) => apiKeys[key]?.trim());
+      const apiKey = provider ? apiKeys[provider]?.trim() : "";
+
+      if (!provider || !apiKey) {
+        toast.error("Add an API key first in the API Keys page");
+        return;
+      }
 
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "x-gemini-api-key": geminiKey 
+          "x-ai-api-key": apiKey,
+          "x-ai-provider": provider,
         },
-        body: JSON.stringify({ type, context }),
+        body: JSON.stringify({ type, context, provider }),
       });
 
       if (!response.ok) {
